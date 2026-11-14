@@ -200,10 +200,19 @@ table.dt tr.cur td{background:var(--sel)}
 
 @media (max-width:760px){
   :root{--railw:0px;--drawerw:100%;--footh:124px}
-  #widgets{width:176px;top:54px} #widgets.right{right:80px}
+  /* mode téléphone : une seule ligne de pastilles, le détail s'ouvre au toucher */
+  #widgets,#widgets.left,#widgets.right{left:10px;right:10px;width:auto;top:calc(54px + env(safe-area-inset-top,0px));flex-direction:row;gap:6px;overflow-x:auto;overflow-y:hidden;max-height:none!important;scrollbar-width:none;padding-bottom:2px}
+  #widgets::-webkit-scrollbar{display:none}
+  .chip{pointer-events:auto;flex:none;display:flex;align-items:center;gap:5px;background:rgba(31,42,58,.93);border:1px solid var(--line);border-radius:999px;padding:5px 10px;font:600 12px var(--mono);color:var(--fg);cursor:pointer;white-space:nowrap}
+  .chip[aria-pressed="true"]{border-color:var(--accent);background:var(--sel)}
+  .chip svg{flex:none}
+  #wpop{position:absolute;left:10px;right:10px;top:calc(92px + env(safe-area-inset-top,0px));z-index:1095}
+  #wpop .wg{max-width:320px}
+  #fc5{left:10px;right:10px;bottom:auto;top:calc(92px + env(safe-area-inset-top,0px));width:auto;max-width:none}
+  #alt{display:none}
+  body.alt-open #alt{display:grid;right:8px;top:calc(92px + env(safe-area-inset-top,0px));bottom:auto}
   .wbig{font-size:18px}
-  #fc5{bottom:8px;width:auto;right:80px}
-  body.drawer-open #fc5,body.drawer-open #widgets{display:none}
+  body.drawer-open #fc5,body.drawer-open #widgets,body.drawer-open #wpop{display:none}
   .favx{opacity:1}
   #rail{top:auto;bottom:var(--footh);left:0;right:0;width:auto;height:56px;flex-direction:row;border-right:0;border-top:1px solid var(--line);padding-top:0}
   #rail .spacer,.brand{display:none}
@@ -218,9 +227,10 @@ table.dt tr.cur td{background:var(--sel)}
   #ticks{display:none}
   #trackWrap{height:28px}
   #status{display:none}
-  #alt{width:64px;right:8px;top:auto;bottom:12px;transform:none}
-  .altbody,#altR{height:150px}
-  body.drawer-open #alt{display:none}
+  #alt{width:80px;transform:none}
+  .altbody,#altR{height:170px}
+  body.drawer-open #alt{display:none!important}
+  #tbAlt{display:flex!important}
 }
 @media (prefers-reduced-motion:reduce){#particles{display:none}}
 </style>
@@ -244,11 +254,13 @@ table.dt tr.cur td{background:var(--sel)}
   <div id="toolbar">
     <button class="tb" id="tbWx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18z"/></svg><span id="tbWxName">Vent</span></button>
     <button class="tb" id="tbMaps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></svg><span class="hide-m">Cartes</span></button>
+    <button class="tb" id="tbAlt" style="display:none" aria-label="Altitude"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5"/></svg><span id="tbAltV">SFC</span></button>
     <button class="tb ad" data-ad="LFBO">LFBO</button>
     <button class="tb ad hide-m" data-ad="LFCL">LFCL</button>
     <div id="readout">Survole la carte · clique pour le détail</div>
   </div>
   <div id="widgets" class="left"></div>
+  <div id="wpop" hidden></div>
   <div id="fc5" class="wg" hidden></div>
   <div id="alt" aria-label="Altitude">
     <span class="k">ALTITUDE</span>
@@ -611,7 +623,7 @@ const overlays={};
 function gridImage(pane,ds,arr,cm,conv,opacity){
   if(overlays[pane]){ map.removeLayer(overlays[pane]); delete overlays[pane]; }
   if(!ds||!arr) return;
-  const size=map.getSize(), cell=isMobile()?4:3, W=Math.ceil(size.x/cell), H=Math.ceil(size.y/cell);
+  const size=map.getSize(), cell=isMobile()?6:3, W=Math.ceil(size.x/cell), H=Math.ceil(size.y/cell);
   const lats=new Float32Array(H), lons=new Float32Array(W);
   for(let y=0;y<H;y++) lats[y]=map.containerPointToLatLng([0,y*cell+cell/2]).lat;
   for(let x=0;x<W;x++) lons[x]=map.containerPointToLatLng([x*cell+cell/2,0]).lng;
@@ -748,13 +760,15 @@ const cv=$("particles"), ctx=cv.getContext("2d"); let parts=[], moving=false;
 function sizeCanvas(){ const d=devicePixelRatio||1, r=cv.getBoundingClientRect(); cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); ctx.setTransform(d,0,0,d,0,0); resetParticles(); }
 function resetParticles(){
   const r=cv.getBoundingClientRect(); ctx.clearRect(0,0,r.width,r.height);
-  const n=Math.min(2600,Math.round(r.width*r.height/(isMobile()?1400:1000)));
+  const n=isMobile()?Math.min(700,Math.round(r.width*r.height/2600)):Math.min(2600,Math.round(r.width*r.height/1000));
   parts=Array.from({length:n},()=>({x:Math.random()*r.width,y:Math.random()*r.height,age:Math.random()*80|0}));
 }
 const PCOL=["#7aa2f7","#4fd1c5","#a3e635","#fbbf24","#f97316","#ef4444","#d946ef"];
+let frameN=0;
 function frame(){
   requestAnimationFrame(frame);
-  if(!S.particles||!GA?.times||moving) return;
+  if(document.hidden||!S.particles||!GA?.times||moving) return;
+  if(isMobile()&&(frameN++&1)) return;   // 30 images/s sur téléphone : moins de chauffe et de batterie
   const r=cv.getBoundingClientRect(), ti=tIndex(GA,curT());
   const u=levelArr(GA,ti,"_u|wind_speed","_u|wind_speed_10m"), v=levelArr(GA,ti,"_v|wind_speed","_v|wind_speed_10m"); if(!u||!v) return;
   const mono=FIELDS[S.field]?.cmap;
@@ -773,7 +787,8 @@ function frame(){
 // ---------- Altimètre ----------
 const ALT_TICKS=[0,5000,10000,18000,30000,39000,45000];
 $("altTicks").innerHTML=ALT_TICKS.map(a=>`<button data-a="${a}" style="bottom:${a/45000*100}%">${a?`FL${String(a/100).padStart(3,"0")}`:"SFC"}</button>`).join("");
-function showAlt(a){ $("altVal").innerHTML=a?`${altName(a)}<small>${a>=6000?a.toLocaleString("fr-FR")+" ft":"≈ "+Math.round(altP(a))+" hPa"}</small>`:"SFC<small>sol</small>"; }
+$("tbAlt").onclick=()=>{ const on=document.body.classList.toggle("alt-open"); if(on){ openChip=null; fc5Open=false; renderWidgets(); renderFc5(); } };
+function showAlt(a){ if($("tbAltV")) $("tbAltV").textContent=altName(a); $("altVal").innerHTML=a?`${altName(a)}<small>${a>=6000?a.toLocaleString("fr-FR")+" ft":"≈ "+Math.round(altP(a))+" hPa"}</small>`:"SFC<small>sol</small>"; }
 let altTimer=null;
 function setAlt(a,immediate){
   S.alt=clamp(Math.round(a/500)*500,0,45000); $("altR").value=S.alt; showAlt(S.alt); save();
@@ -824,16 +839,20 @@ function fltCat(m){
 const metarWind=m=>{ const w=m?.match(/\s(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT/); return w?`${w[1]}/${w[2]}${w[3]?"G"+w[3]:""}`:""; };
 async function initMetars(){
   try{ await loadMetarText(); }catch(e){ status("METAR indisponibles (VATSIM ne répond pas)"); return; }
+  // sur téléphone, la base des aérodromes (gros fichiers) se télécharge après le démarrage, une seule fois
+  let cached=false; try{ cached=!!localStorage.getItem("rb2st"); }catch(e){}
+  if(!ST&&!stationsLoading&&isMobile()&&!cached) await new Promise(r=>setTimeout(r,6000));
   if(!ST){ if(!stationsLoading) stationsLoading=buildStations().catch(()=>status("Base aérodromes indisponible")); await stationsLoading; }
   drawMetars(); if(P) renderPoint();
 }
 function drawMetars(){
   metarLayer.clearLayers();
   $("map").classList.toggle("zl",map.getZoom()>=8);
-  if(!S.metar||!ST||map.getZoom()<5) return;
+  const mob=isMobile();
+  if(!S.metar||!ST||map.getZoom()<(mob?6.5:5)) return;
   const b=map.getBounds().pad(.05); let n=0;
   for(const [id,s] of Object.entries(ST)){
-    if(!METARS[id]||!b.contains([s[0],s[1]])) continue; if(++n>900) break;
+    if(!METARS[id]||!b.contains([s[0],s[1]])) continue; if(++n>(mob?220:900)) break;
     const raw=METARS[id], cat=fltCat(raw);
     L.marker([s[0],s[1]],{pane:"obs",icon:L.divIcon({className:"",html:`<div class="apt ${cat}"><i></i><b>${id} <span>${metarWind(raw)}</span></b></div>`,iconSize:[12,12],iconAnchor:[6,6]}),bubblingMouseEvents:false,keyboard:false})
      .bindTooltip(`<b>${id}</b> <span class="cat ${cat}">${cat}</span> ${s[3]}<br>${raw}`,{direction:"top",offset:[0,-6]})
@@ -1226,13 +1245,14 @@ function fc5Rows(D,off,cur,n=5){
   }).join("");
 }
 function renderFc5(){
-  const el=$("fc5"), D=REF?.d?.daily; el.hidden=!S.fc5||!D; if(el.hidden) return;
+  const el=$("fc5"), D=REF?.d?.daily; el.hidden=!S.fc5||!D||(isMobile()&&!fc5Open); if(el.hidden) return;
   el.innerHTML=`<div class="wk"><span>Prévisions 5 jours</span><span class="wn">${esc(REF.name)}</span><button id="fc5t" aria-label="${S.fc5c?"Déplier":"Replier"}">${S.fc5c?"+":"–"}</button></div>${S.fc5c?"":fc5Rows(D,REF.d.utc_offset_seconds||0,REF.d.current?.temperature_2m)}`;
   $("fc5t").onclick=()=>{ S.fc5c=!S.fc5c; save(); renderFc5(); };
   layoutWidgets();
 }
 // les widgets à gauche s'arrêtent au-dessus du bandeau 5 jours (le reste défile)
 function layoutWidgets(){
+  if(isMobile()) return;
   const w=$("widgets"), f=$("fc5"), st=$("stage").getBoundingClientRect();
   let bottom=st.height-12;
   if(!f.hidden&&S.wpos!=="right") bottom=f.getBoundingClientRect().top-st.top-8;
@@ -1274,9 +1294,33 @@ function widgetHtml(w,d,name){
   if(w==="kp") return `<div class="wg">${head("Indice Kp")}<div class="wrow"><div class="wmini"><div class="wbig">${KP?.cur==null?"–":n0(KP.cur,1)}</div>${KPL(KP?.cur)}<br>max prévu 24 h <b>${KP?.max24==null?"–":n0(KP.max24,1)}</b></div></div></div>`;
   return "";
 }
+let openChip=null, fc5Open=false;
+function chipHtml(w,d){
+  const c=d?.current, D=d?.daily, off=d?.utc_offset_seconds||0, lt2=t=>t==null?"–":new Date((t+off)*1000).toISOString().slice(11,16);
+  const arrow=c?`<svg width="14" height="14" viewBox="0 0 24 24"><g transform="rotate(${(c.wind_direction_10m||0)+180} 12 12)"><path d="M12 3l5 9h-3.5v9h-3v-9H7z" fill="#3b8cf5"/></g></svg>`:"";
+  const v={wind:c?`${arrow}${card16(c.wind_direction_10m)} ${Math.round(c.wind_speed_10m)} kt`:"Vent",
+    temp:c?`${wxIcon(c.weather_code,c.is_day,16)}${Math.round(c.temperature_2m)}°`:"Temp.",
+    moon:(()=>{const m=moon(Date.now()/1000);return `${moonSvg(m.p,16)}${m.ill} %`;})(),
+    sun:`${wxIcon(0,1,16)}${lt2(D?.sunset?.[0])}`,
+    press:c?`${Math.round(c.pressure_msl)} hPa`:"Pression",
+    kp:`Kp ${KP?.cur==null?"–":n0(KP.cur,1)}`}[w];
+  return v?`<button class="chip" data-chip="${w}" aria-pressed="${openChip===w}">${v}</button>`:"";
+}
 function renderWidgets(){
-  const el=$("widgets"); el.className=S.wpos==="right"?"right":"left";
-  const r=REF||refLoc(); el.innerHTML=S.widgets.map(w=>widgetHtml(w,REF?.d,r.name)).join("");
+  const el=$("widgets"), r=REF||refLoc();
+  if(isMobile()){
+    el.className="";
+    el.innerHTML=S.widgets.map(w=>chipHtml(w,REF?.d)).join("")+(S.fc5?`<button class="chip" data-chip="fc5" aria-pressed="${fc5Open}">${wxIcon(REF?.d?.daily?.weather_code?.[1],1,16)}5 jours</button>`:"");
+    el.querySelectorAll("[data-chip]").forEach(b=>b.onclick=()=>{ const k=b.dataset.chip;
+      document.body.classList.remove("alt-open");
+      if(k==="fc5"){ fc5Open=!fc5Open; openChip=null; } else { openChip=openChip===k?null:k; fc5Open=false; }
+      renderWidgets(); renderFc5(); });
+    const pop=$("wpop"); pop.hidden=!openChip; pop.innerHTML=openChip?widgetHtml(openChip,REF?.d,r.name):"";
+    return;
+  }
+  $("wpop").hidden=true;
+  el.className=S.wpos==="right"?"right":"left";
+  el.innerHTML=S.widgets.map(w=>widgetHtml(w,REF?.d,r.name)).join("");
   layoutWidgets();
 }
 
@@ -1308,12 +1352,15 @@ const isFav=(lat,lon)=>S.favs.findIndex(f=>Math.abs(f.lat-lat)<.01&&Math.abs(f.l
 // ---------- Interactions carte ----------
 map.on("click",e=>openPoint(e.latlng.lat,e.latlng.lng));
 map.on("movestart zoomstart",()=>{moving=true;const r=cv.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);});
-map.on("moveend",()=>{moving=false;renderAll();resetParticles();scheduleGrids();clearTimeout(map._mt);map._mt=setTimeout(drawMetars,300);});
+let moveTimer=null;
+map.on("moveend",()=>{ clearTimeout(moveTimer);
+  moveTimer=setTimeout(()=>{ moving=false; renderAll(); resetParticles(); scheduleGrids(); clearTimeout(map._mt); map._mt=setTimeout(drawMetars,300); },isMobile()?220:0); });
 let roPending=false;
 map.on("mousemove",e=>{ if(roPending) return; roPending=true; requestAnimationFrame(()=>{ roPending=false;
   const f=FIELDS[S.field], v=fieldValue(e.latlng.lat,e.latlng.lng);
   $("readout").innerHTML=`${fmtCoord(e.latlng.lat,wrapLon(e.latlng.lng))}${f?.cmap?` · ${f.name} <b>${Number.isNaN(v)?"–":(Math.abs(v)<10&&f.unit!=="%"?v.toFixed(1):Math.round(v))} ${f.unit}</b>`:""}`; }); });
-addEventListener("resize",()=>{sizeCanvas();renderAll();layoutWidgets();});
+let resizeTimer=null;
+addEventListener("resize",()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(()=>{ map.invalidateSize(); sizeCanvas(); renderAll(); renderWidgets(); renderFc5(); },150); });
 function status(t){$("status").textContent=t;}
 
 // ---------- Démarrage ----------
