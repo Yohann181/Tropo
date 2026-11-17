@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#151d29">
+<meta name="theme-color" content="#2a3442">
 <title>Tropo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -14,17 +14,25 @@
 <meta name="apple-mobile-web-app-title" content="Tropo">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
+<link rel="preconnect" href="https://server.arcgisonline.com">
+<link rel="preconnect" href="https://tilecache.rainviewer.com">
+<link rel="preconnect" href="https://api.met.no" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 /* Poste de préparation des vols : rail à gauche, tiroir de panneaux, carte, altimètre à droite, frise temporelle en bas (thème cockpit sombre unique) */
 :root{
-  --bg:#151d29; --rail:#1a2332; --panel:#1f2a3a; --row:#243246; --row-h:#2a3a51; --line:#2f3e54;
-  --sel:#1e4f86; --fg:#e8eef6; --muted:#8fa0b8; --accent:#3b8cf5;
+  /* thème Ardoise (par défaut) : gris-bleu plus clair */
+  --bg:#2a3442; --rail:#303b4b; --panel:#364354; --row:#3e4b5e; --row-h:#475670; --line:#506077;
+  --sel:#2f6cb3; --fg:#f3f6fa; --muted:#b0bccc; --accent:#4f9dff;
+  --glass:rgba(54,67,84,.92); --mapbg:#1d2530;
   --vfr:#2ecc71; --mvfr:#3b8cf5; --ifr:#ef4444; --lifr:#d946ef; --warn:#f5b83b;
   --ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
   --railw:72px; --drawerw:370px; --footh:96px;
   color-scheme:dark;
 }
+/* thème Nuit (l'ancien bleu nuit) */
+:root[data-theme="nuit"]{--bg:#151d29;--rail:#1a2332;--panel:#1f2a3a;--row:#243246;--row-h:#2a3a51;--line:#2f3e54;--sel:#1e4f86;--fg:#e8eef6;--muted:#8fa0b8;--accent:#3b8cf5;--glass:rgba(31,42,58,.93);--mapbg:#0e141d}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 var(--ui);overflow:hidden}
@@ -45,7 +53,12 @@ a{color:var(--accent)}
 
 #stage{position:fixed;left:var(--railw);top:0;right:0;bottom:var(--footh)}
 body.drawer-open #stage{left:calc(var(--railw) + var(--drawerw))}
-#map{position:absolute;inset:0;background:#0e141d}
+#map{position:absolute;inset:0;background:var(--mapbg)}
+#busy{position:absolute;left:0;right:0;top:0;height:3px;z-index:1200;overflow:hidden;pointer-events:none;opacity:0;transition:opacity .2s}
+#busy.on{opacity:1}
+#busy::after{content:"";position:absolute;top:0;bottom:0;width:30%;left:-30%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:busy 1.1s ease-in-out infinite}
+@keyframes busy{to{left:100%}}
+@media (prefers-reduced-motion:reduce){#busy::after{animation:none;left:0;width:100%;opacity:.6}}
 #particles{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:401}
 
 #toolbar{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:10px;z-index:1100;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
@@ -112,7 +125,7 @@ input.txt{width:100%;background:var(--bg);border:1px solid var(--line);border-ra
 .tile .h{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .metar{margin:10px 14px;font:12px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;word-break:break-word}
 .cat{display:inline-block;padding:1px 7px;border-radius:4px;font:700 11px var(--mono);color:#fff;margin-right:6px}
-.cat.VFR{background:var(--vfr)}.cat.MVFR{background:var(--mvfr)}.cat.IFR{background:var(--ifr)}.cat.LIFR{background:var(--lifr)}.cat.UNK{background:#5b6b82}
+.cat.VFR{background:var(--vfr)}.cat.MVFR{background:var(--mvfr)}.cat.IFR{background:var(--ifr)}.cat.LIFR{background:var(--lifr)}.cat.UNK{background:#6d7d94}
 .pill{display:inline-block;padding:1px 8px;border-radius:999px;font:700 12px var(--mono);color:#0d1418}
 .pill.ok{background:var(--vfr)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--ifr)}
 .xw{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;padding:10px 14px;align-items:center;font:12px var(--mono);border-bottom:1px solid var(--line)}
@@ -153,8 +166,8 @@ table.dt tr.cur td{background:var(--sel)}
 #tLabel{font:600 12px var(--mono);white-space:nowrap;min-width:200px;text-align:right}
 #tLabel .k{display:block;font-size:10px;color:var(--muted);font-weight:400}
 
-.leaflet-container{background:#0e141d;font-family:var(--ui)}
-.leaflet-control-attribution{background:rgba(21,29,41,.8)!important;color:var(--muted)!important;font-size:10px}
+.leaflet-container{background:var(--mapbg);font-family:var(--ui)}
+.leaflet-control-attribution{background:var(--glass)!important;color:var(--muted)!important;font-size:10px}
 .leaflet-control-attribution a{color:var(--accent)!important}
 .leaflet-tooltip{background:var(--panel);color:var(--fg);border:1px solid var(--line);font:11.5px/1.45 var(--mono);max-width:360px;white-space:normal}
 .leaflet-div-icon{background:none;border:0}
@@ -162,7 +175,7 @@ table.dt tr.cur td{background:var(--sel)}
 /* Widgets sur la carte */
 #widgets{position:absolute;top:calc(58px + env(safe-area-inset-top,0px));z-index:1090;display:flex;flex-direction:column;gap:8px;width:224px;pointer-events:none;max-height:calc(100% - 300px);overflow:hidden}
 #widgets.left{left:10px} #widgets.right{right:100px}
-.wg{pointer-events:auto;background:rgba(31,42,58,.93);border:1px solid var(--line);border-radius:12px;padding:10px 12px;backdrop-filter:blur(6px)}
+.wg{pointer-events:auto;background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:10px 12px;backdrop-filter:blur(6px)}
 .wk{font:700 10px var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px;align-items:center}
 .wk > span:first-child{white-space:nowrap}
 .wk .wn{text-transform:none;letter-spacing:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;text-align:right}
@@ -175,7 +188,7 @@ table.dt tr.cur td{background:var(--sel)}
 /* Prévisions 5 jours (façon Météo d'Apple) */
 #fc5{position:absolute;left:10px;bottom:12px;z-index:1090;width:310px;max-width:calc(100% - 110px)}
 #fc5 .wk button{background:none;border:0;color:var(--muted);cursor:pointer;font:600 14px var(--ui);padding:0 2px}
-.d5{display:grid;grid-template-columns:44px 30px 36px minmax(40px,1fr) 36px;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(47,62,84,.8);font:600 13px var(--ui)}
+.d5{display:grid;grid-template-columns:44px 30px 36px minmax(40px,1fr) 36px;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font:600 13px var(--ui)}
 .d5:first-of-type{border-top:0}
 .d5 .ico{display:grid;justify-items:center;line-height:1}
 .d5 .pp{font-size:9.5px;color:#7fc3ff;font-weight:700;margin-top:1px}
@@ -183,7 +196,7 @@ table.dt tr.cur td{background:var(--sel)}
 .d5 .hi{font-family:var(--mono)}
 .d5 .bar{position:relative;height:5px;border-radius:3px;background:rgba(255,255,255,.09)}
 .d5 .bar i{position:absolute;top:0;bottom:0;border-radius:3px}
-.d5 .bar b{position:absolute;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#fff;border:1.5px solid #1f2a3a}
+.d5 .bar b{position:absolute;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#fff;border:1.5px solid var(--panel)}
 .pt-fc5{padding:4px 14px 8px;border-bottom:1px solid var(--line)}
 /* Favoris */
 .fav{position:relative;display:grid;grid-template-columns:1fr auto;gap:3px 10px;padding:12px 14px;margin:8px 10px;border-radius:14px;background:linear-gradient(135deg,#2f5f96,#1d3557);cursor:pointer;border:0;color:#fff}
@@ -203,7 +216,7 @@ table.dt tr.cur td{background:var(--sel)}
   /* mode téléphone : une seule ligne de pastilles, le détail s'ouvre au toucher */
   #widgets,#widgets.left,#widgets.right{left:10px;right:10px;width:auto;top:calc(54px + env(safe-area-inset-top,0px));flex-direction:row;gap:6px;overflow-x:auto;overflow-y:hidden;max-height:none!important;scrollbar-width:none;padding-bottom:2px}
   #widgets::-webkit-scrollbar{display:none}
-  .chip{pointer-events:auto;flex:none;display:flex;align-items:center;gap:5px;background:rgba(31,42,58,.93);border:1px solid var(--line);border-radius:999px;padding:5px 10px;font:600 12px var(--mono);color:var(--fg);cursor:pointer;white-space:nowrap}
+  .chip{pointer-events:auto;flex:none;display:flex;align-items:center;gap:5px;background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:5px 10px;font:600 12px var(--mono);color:var(--fg);cursor:pointer;white-space:nowrap}
   .chip[aria-pressed="true"]{border-color:var(--accent);background:var(--sel)}
   .chip svg{flex:none}
   #wpop{position:absolute;left:10px;right:10px;top:calc(92px + env(safe-area-inset-top,0px));z-index:1095}
@@ -250,11 +263,13 @@ table.dt tr.cur td{background:var(--sel)}
 
 <div id="stage">
   <div id="map" aria-label="Carte météo mondiale"></div>
+  <div id="busy" aria-hidden="true"></div>
   <canvas id="particles"></canvas>
   <div id="toolbar">
     <button class="tb" id="tbWx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18z"/></svg><span id="tbWxName">Vent</span></button>
     <button class="tb" id="tbMaps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></svg><span class="hide-m">Cartes</span></button>
     <button class="tb" id="tbAlt" style="display:none" aria-label="Altitude"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5"/></svg><span id="tbAltV">SFC</span></button>
+    <button class="tb" id="tbLoc" aria-label="Me localiser" title="Me localiser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/></svg></button>
     <button class="tb ad" data-ad="LFBO">LFBO</button>
     <button class="tb ad hide-m" data-ad="LFCL">LFCL</button>
     <div id="readout">Survole la carte · clique pour le détail</div>
@@ -321,13 +336,19 @@ const RAD=Math.PI/180;
 const BASE_IDS=["dark","light","sat","topo","street"];
 const DEF={base:"dark",charts:{},chartOpacity:.85,field:"wind",alt:0,particles:true,radar:true,metar:true,sat:false,
   ovRain:false,ovCloud:false,ovValues:false,ovIso:false,ovJet:false,fieldOpacity:.6,keys:{openaip:""},xlim:10,qfu:143,grid:10,
-  favs:[{name:"Blagnac",lat:43.6293,lon:1.3638,icao:"LFBO"}],widgets:["wind","moon"],wpos:"left",fc5:true,fc5c:false};
+  favs:[{name:"Blagnac",lat:43.6293,lon:1.3638,icao:"LFBO"}],widgets:["wind","moon"],wpos:"left",fc5:true,fc5c:false,theme:"ardoise"};
 let S=structuredClone(DEF);
 try{const raw=localStorage.getItem("rb3")||localStorage.getItem("rb2"); if(raw) S=Object.assign(S,JSON.parse(raw));}catch(e){}
 if(![8,10,14].includes(S.grid)) S.grid=10;
 if(!BASE_IDS.includes(S.base)) S.base="dark";
 S.alt=clamp(+S.alt||0,0,45000); delete S.level; if(S.charts) delete S.charts.oaci;
 function save(){try{localStorage.setItem("rb3",JSON.stringify(S));}catch(e){}}
+function applyTheme(){ document.documentElement.dataset.theme=S.theme==="nuit"?"nuit":"ardoise";
+  const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=S.theme==="nuit"?"#151d29":"#2a3442"; }
+applyTheme();
+// barre de chargement : visible tant qu'au moins un téléchargement est en cours
+const loading=new Set();
+function setLoading(k,on){ on?loading.add(k):loading.delete(k); const b=document.getElementById("busy"); if(b) b.classList.toggle("on",loading.size>0); }
 
 // ---------- Icônes ----------
 const IC={
@@ -408,6 +429,20 @@ const CM={
  jet:[[0,[120,80,220,0]],[55,[120,80,220,0]],[60,[120,80,220,.45]],[80,[90,120,240,.62]],[100,[60,190,230,.72]],[130,[240,220,90,.82]],[160,[240,110,60,.9]],[200,[230,50,120,.95]]],
  sst:[[-2,[130,80,195,.85]],[5,[50,90,200,.85]],[10,[60,150,220,.85]],[15,[80,190,160,.85]],[20,[200,210,80,.85]],[25,[240,140,50,.9]],[30,[210,50,50,.9]]],
 };
+// Calque canvas : on pose directement le canvas sur la carte (plus d'encodage/décodage d'image PNG)
+const CanvasLayer=L.ImageOverlay.extend({
+  _initImage(){ const el=this._image=this._url; L.DomUtil.addClass(el,"leaflet-image-layer"); if(this._zoomAnimated) L.DomUtil.addClass(el,"leaflet-zoom-animated");
+    el.onselectstart=L.Util.falseFn; el.onmousemove=L.Util.falseFn; }
+});
+const canvasLayer=(c,o)=>new CanvasLayer(c,map.getBounds(),{interactive:false,...o});
+// Palettes précalculées (512 teintes) : une simple lecture de tableau par pixel
+const LUTS={};
+function lut(name){
+  if(LUTS[name]) return LUTS[name];
+  const st=CM[name], a=st[0][0], b=st[st.length-1][0], n=512, t=new Uint8ClampedArray(n*4);
+  for(let i=0;i<n;i++){ const c=cmap(name,a+(b-a)*i/(n-1)); t[i*4]=c[0]; t[i*4+1]=c[1]; t[i*4+2]=c[2]; t[i*4+3]=c[3]*255; }
+  return LUTS[name]={t,a,k:(n-1)/(b-a),n};
+}
 function cmap(name,v){
   const s=CM[name]; if(v<=s[0][0]) return s[0][1]; if(v>=s[s.length-1][0]) return s[s.length-1][1];
   for(let i=1;i<s.length;i++) if(v<=s[i][0]){ const [a,ca]=s[i-1],[b,cb]=s[i],f=(v-a)/(b-a); return [0,1,2,3].map(k=>ca[k]+(cb[k]-ca[k])*f); }
@@ -497,11 +532,15 @@ async function loadRadar(){
     rLayers.forEach(l=>map.removeLayer(l));
     rFrames=j.radar?.past||[];
     rLayers=rFrames.map(f=>L.tileLayer(`${j.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`,{pane:"radar",opacity:0,maxNativeZoom:7,maxZoom:18}));
-    if(S.radar) rLayers.forEach(l=>l.addTo(map));
+    // les images radar sont chargées à la demande (image affichée + la suivante), pas les 13 d'un coup
   }catch(e){ rFrames=[]; status("Radar indisponible"); }
   buildEntries();
 }
-function showRadar(){ const e=entries[tIdx]; rLayers.forEach((l,k)=>l.setOpacity(S.radar&&e?.kind==="radar"&&e.i===k?.8:0)); }
+function showRadar(){
+  const e=entries[tIdx], cur=S.radar&&e?.kind==="radar"?e.i:-1;
+  if(cur>=0) [cur,(cur+1)%rLayers.length].forEach(k=>{ const l=rLayers[k]; if(l&&!map.hasLayer(l)) l.addTo(map); });
+  rLayers.forEach((l,k)=>{ if(map.hasLayer(l)) l.setOpacity(k===cur?.8:0); });
+}
 
 // ---------- Grilles modèles ----------
 /* Open-Meteo compte chaque point de grille comme une requête (limites gratuites ~600/min, 5 000/h, 10 000/jour).
@@ -532,16 +571,48 @@ function viewBox(pad){
   return {s,n,w,e};
 }
 function boxOk(ds){
-  if(!ds||Date.now()-ds.at>60*60e3||ds.k!==S.grid) return false;
+  if(!ds||Date.now()-ds.at>90*60e3||ds.k!==GRIDN()) return false;
   const v=viewBox(0), vw=v.e-v.w, dw=ds.e-ds.w;
   const inside=ds.s<=v.s+.01&&ds.n>=v.n-.01&&(dw>=359||(ds.w<=v.w+.01&&ds.e>=v.e-.01));
   return inside && vw>dw/4.5;
 }
-function newBox(){ const b=viewBox(.5); return {s:b.s,n:b.n,w:b.w,e:b.e,k:S.grid,at:Date.now(),groups:new Set(),data:{},times:null,id:Math.random()}; }
-function usage(add){ // estimation des requêtes consommées sur l'heure glissante
+function newBox(){ const b=viewBox(.5); return {s:+b.s.toFixed(2),n:+b.n.toFixed(2),w:+b.w.toFixed(2),e:+b.e.toFixed(2),k:GRIDN(),at:Date.now(),groups:new Set(),data:{},times:null,id:Math.random()}; }
+function usage(add,win=3600e3){ // estimation des requêtes Open-Meteo consommées (heure ou 24 h glissantes)
   let u=[]; try{u=JSON.parse(localStorage.getItem("rb3use")||"[]");}catch(e){}
-  const now=Date.now(); u=u.filter(x=>now-x[0]<3600e3); if(add) u.push([now,add]);
-  try{localStorage.setItem("rb3use",JSON.stringify(u));}catch(e){} return u.reduce((a,x)=>a+x[1],0);
+  const now=Date.now(); u=u.filter(x=>now-x[0]<864e5); if(add) u.push([now,add]);
+  try{localStorage.setItem("rb3use",JSON.stringify(u));}catch(e){} return u.filter(x=>now-x[0]<win).reduce((a,x)=>a+x[1],0);
+}
+const GRIDN=()=>isMobile()?Math.min(S.grid,8):S.grid;
+// Pause Open-Meteo : quand la limite est atteinte, on arrête de le solliciter jusqu'à la fin de la période
+function omBlockedUntil(){ try{ return +localStorage.getItem("rb3block")||0; }catch(e){ return 0; } }
+const omBlocked=()=>omBlockedUntil()>Date.now()||usage(0,864e5)>9300;
+function omHitLimit(reason){
+  const now=new Date(); let until;
+  if(/Daily/i.test(reason)) until=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1,0,5);
+  else if(/Hourly/i.test(reason)) until=Date.now()+20*60e3; else until=Date.now()+65e3;
+  try{ localStorage.setItem("rb3block",String(until)); }catch(e){}
+  return until;
+}
+// Cache des grilles sur l'appareil (IndexedDB) : une zone déjà chargée n'est pas redemandée pendant 90 min
+const IDBS={p:null};
+function idb(){ if(IDBS.p) return IDBS.p; IDBS.p=new Promise(res=>{ try{ const rq=indexedDB.open("tropo",1); rq.onupgradeneeded=()=>rq.result.createObjectStore("grids",{keyPath:"key"}); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>res(null); }catch(e){ res(null); } }); return IDBS.p; }
+async function idbAll(){ const db=await idb(); if(!db) return []; return new Promise(res=>{ const out=[]; try{ const c=db.transaction("grids").objectStore("grids").openCursor();
+  c.onsuccess=()=>{ const cur=c.result; if(cur){ out.push(cur.value); cur.continue(); } else res(out); }; c.onerror=()=>res(out); }catch(e){ res(out); } }); }
+async function idbPut(v){ const db=await idb(); if(!db) return; try{ db.transaction("grids","readwrite").objectStore("grids").put(v); }catch(e){} }
+async function idbPrune(){ const all=await idbAll(), db=await idb(); if(!db||!all.length) return;
+  const sorted=all.sort((a,b)=>b.at-a.at), drop=sorted.filter((v,i)=>i>=40||Date.now()-v.at>3*3600e3);
+  try{ const st=db.transaction("grids","readwrite").objectStore("grids"); drop.forEach(v=>st.delete(v.key)); }catch(e){} }
+function coversView(e){
+  const v=viewBox(0), vw=v.e-v.w, dw=e.e-e.w;
+  return e.s<=v.s+.01&&e.n>=v.n-.01&&(dw>=359||(e.w<=v.w+.01&&e.e>=v.e-.01))&&vw>dw/4.5;
+}
+async function boxFromCache(kind){
+  const all=(await idbAll()).filter(e=>e.kind===kind&&e.k===GRIDN()&&Date.now()-e.at<90*60e3&&coversView(e));
+  if(!all.length) return null;
+  const best=all.sort((a,b)=>b.at-a.at)[0], same=all.filter(e=>e.s===best.s&&e.n===best.n&&e.w===best.w&&e.e===best.e);
+  const box={s:best.s,n:best.n,w:best.w,e:best.e,k:best.k,at:Math.min(...same.map(e=>e.at)),groups:new Set(),data:{},times:best.times,id:Math.random()};
+  same.forEach(e=>{ Object.assign(box.data,e.data); e.groups.forEach(g=>box.groups.add(g)); });
+  return box;
 }
 async function fetchGrid(kind,vars,box){
   const n=box.k, lats=[], lons=[];
@@ -551,7 +622,7 @@ async function fetchGrid(kind,vars,box){
   usage(n*n);
   const r=await fetch(`${base}?latitude=${lats.join(",")}&longitude=${lons.join(",")}&hourly=${vars.join(",")}&timeformat=unixtime${extra}`);
   const j=await r.json();
-  if(r.status===429||/limit/i.test(j?.reason||"")){ const e=new Error(j?.reason||"limite"); e.limit=/Daily/i.test(j?.reason)?"jour":/Hourly/i.test(j?.reason)?"heure":"minute"; throw e; }
+  if(r.status===429||/limit/i.test(j?.reason||"")){ const e=new Error(j?.reason||"limite"); e.limit=/Daily/i.test(j?.reason)?"jour":/Hourly/i.test(j?.reason)?"heure":"minute"; e.until=omHitLimit(j?.reason||""); throw e; }
   if(!Array.isArray(j)) throw new Error(j.reason||"réponse inattendue");
   const times=j[0].hourly.time, T=times.length, N=n*n, data={};
   for(const v of vars) data[v]=Array.from({length:T},()=>new Float32Array(N).fill(NaN));
@@ -566,27 +637,41 @@ async function fetchGrid(kind,vars,box){
 function scheduleGrids(delay=700){ clearTimeout(gridTimer); gridTimer=setTimeout(refreshGrids,delay); }
 async function refreshGrids(){
   if(busy){ scheduleGrids(800); return; }
-  const seq=++gridSeq, jobs=[], groups=neededGroups();
+  const seq=++gridSeq, jobs=[], groups=neededGroups(), blocked=omBlocked();
+  const store=(kind,box,g,d)=>idbPut({key:`${kind}|${g.join("+")}|${box.s},${box.n},${box.w},${box.e}|${box.k}`,kind,groups:g,s:box.s,n:box.n,w:box.w,e:box.e,k:box.k,at:Date.now(),times:d.times,data:d.data});
+  let fromCache=false, pauseErr=null;
   if(groups.length){
-    const box=boxOk(GA)?GA:newBox();
+    let box=boxOk(GA)?GA:await boxFromCache("atm");
+    if(seq!==gridSeq) return;
+    if(box&&box!==GA&&groups.some(g=>box.groups.has(g))){ GA=box; arrCache.clear(); fromCache=true; }
+    if(!box) box=newBox();
     const missing=groups.filter(g=>!box.groups.has(g)), packs=[];
     for(const g of missing){ const vs=groupVars(g); const p=packs.find(p=>p.vars.length+vs.length<=10); if(p){p.vars.push(...vs);p.g.push(g);} else packs.push({vars:[...vs],g:[g]}); }
-    for(const p of packs) jobs.push(fetchGrid("atm",p.vars,box).then(d=>{ Object.assign(box.data,d.data); box.times=d.times; p.g.forEach(g=>box.groups.add(g)); arrCache.clear(); if(seq===gridSeq) GA=box; }));
+    if(!blocked) for(const p of packs) jobs.push(fetchGrid("atm",p.vars,box).then(d=>{ Object.assign(box.data,d.data); box.times=d.times; p.g.forEach(g=>box.groups.add(g)); arrCache.clear(); store("atm",box,p.g,d); if(seq===gridSeq) GA=box; }));
+    else if(packs.length) pauseErr={limit:"pause",until:omBlockedUntil()};
   }
   if(FIELDS[S.field]?.marine){
-    const box=boxOk(GM)?GM:newBox();
-    if(!box.groups.has("marine")) jobs.push(fetchGrid("marine",["sea_surface_temperature","wave_height","wave_direction","wave_period"],box).then(d=>{ Object.assign(box.data,d.data); box.times=d.times; box.groups.add("marine"); if(seq===gridSeq) GM=box; }));
+    let box=boxOk(GM)?GM:await boxFromCache("marine");
+    if(seq!==gridSeq) return;
+    if(box&&box!==GM){ GM=box; fromCache=true; }
+    if(!box) box=newBox();
+    if(!box.groups.has("marine")){
+      if(!blocked) jobs.push(fetchGrid("marine",["sea_surface_temperature","wave_height","wave_direction","wave_period"],box).then(d=>{ Object.assign(box.data,d.data); box.times=d.times; box.groups.add("marine"); store("marine",box,["marine"],d); if(seq===gridSeq) GM=box; }));
+      else pauseErr={limit:"pause",until:omBlockedUntil()};
+    }
   }
-  if(!jobs.length) return;
-  busy=true; status("Chargement du modèle…");
-  const res=await Promise.allSettled(jobs); busy=false;
-  const err=res.find(r=>r.status==="rejected")?.reason;
+  if(fromCache){ renderAll(); resetParticles(); }
+  if(!jobs.length&&pauseErr){ status(`Couches modèle en pause jusqu'à ${lt(pauseErr.until/1000)} (limite gratuite Open-Meteo). Radar, METAR, favoris et fiches Point restent disponibles.`); clearTimeout(retryTimer); retryTimer=setTimeout(refreshGrids,clamp(pauseErr.until-Date.now()+5e3,30e3,6*3600e3)); return; }
+  if(!jobs.length){ if(fromCache) status(`Modèle chargé depuis le cache de l'appareil · ${lt(Date.now()/1000)}`); return; }
+  busy=true; setLoading("grid",true); status("Chargement du modèle…");
+  const res=await Promise.allSettled(jobs); busy=false; setLoading("grid",false);
+  const err=res.find(r=>r.status==="rejected")?.reason||pauseErr;
   if(err?.limit){
-    const wait={minute:65e3,heure:10*60e3,jour:60*60e3}[err.limit];
-    status(`Limite gratuite Open-Meteo atteinte (par ${err.limit}) : nouvel essai automatique dans ${Math.round(wait/60e3)} min`);
+    const until=err.until||Date.now()+65e3, wait=clamp(until-Date.now()+5e3,30e3,6*3600e3);
+    status(`Couches modèle en pause jusqu'à ${lt(until/1000)} (limite gratuite Open-Meteo). Radar, METAR, favoris et fiches Point restent disponibles.`);
     clearTimeout(retryTimer); retryTimer=setTimeout(refreshGrids,wait);
   } else if(err) status("Modèle indisponible : "+err.message);
-  else status(`Modèles Météo-France / ECMWF / GFS · grille ${S.grid}×${S.grid} · ${lt(Date.now()/1000)}`);
+  else { status(`Modèles Météo-France / ECMWF / GFS · grille ${GRIDN()}×${GRIDN()} · ${lt(Date.now()/1000)}`); idbPrune(); }
   if(seq===gridSeq){ renderAll(); resetParticles(); }
 }
 function tIndex(ds,t){ const ts=ds.times; let best=0; for(let i=1;i<ts.length;i++) if(Math.abs(ts[i]-t)<Math.abs(ts[best]-t)) best=i; return best; }
@@ -623,17 +708,23 @@ const overlays={};
 function gridImage(pane,ds,arr,cm,conv,opacity){
   if(overlays[pane]){ map.removeLayer(overlays[pane]); delete overlays[pane]; }
   if(!ds||!arr) return;
-  const size=map.getSize(), cell=isMobile()?6:3, W=Math.ceil(size.x/cell), H=Math.ceil(size.y/cell);
-  const lats=new Float32Array(H), lons=new Float32Array(W);
-  for(let y=0;y<H;y++) lats[y]=map.containerPointToLatLng([0,y*cell+cell/2]).lat;
-  for(let x=0;x<W;x++) lons[x]=map.containerPointToLatLng([x*cell+cell/2,0]).lng;
+  const size=map.getSize(), cell=isMobile()?6:4, W=Math.ceil(size.x/cell), H=Math.ceil(size.y/cell), n=ds.k;
+  // la latitude ne dépend que de la ligne et la longitude que de la colonne : on précalcule les positions dans la grille
+  const fyA=new Float32Array(H), fxA=new Float32Array(W);
+  for(let y=0;y<H;y++){ const lat=map.containerPointToLatLng([0,y*cell+cell/2]).lat; fyA[y]=lat<ds.s||lat>ds.n?-1:(lat-ds.s)/(ds.n-ds.s)*(n-1); }
+  for(let x=0;x<W;x++){ let L=map.containerPointToLatLng([x*cell+cell/2,0]).lng; if(L<ds.w) L+=360*Math.ceil((ds.w-L)/360); if(L>ds.e) L-=360*Math.ceil((L-ds.e)/360); fxA[x]=L<ds.w||L>ds.e?-1:(L-ds.w)/(ds.e-ds.w)*(n-1); }
   const c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d"), img=g.createImageData(W,H), D=img.data;
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-    let val=sampleArr(ds,arr,lats[y],lons[x]); if(Number.isNaN(val)) continue; if(conv) val=conv(val);
-    const col=cmap(cm,val), k=(y*W+x)*4; D[k]=col[0];D[k+1]=col[1];D[k+2]=col[2];D[k+3]=col[3]*255;
-  }
+  const L0=lut(cm), T0=L0.t, la=L0.a, lk=L0.k, ln=L0.n-1;
+  for(let y=0;y<H;y++){ const fy=fyA[y]; if(fy<0) continue; const y0=Math.min(fy|0,n-2), dy=fy-y0, r0=y0*n, r1=r0+n;
+    for(let x=0;x<W;x++){ const fx=fxA[x]; if(fx<0) continue; const x0=Math.min(fx|0,n-2), dx=fx-x0;
+      const a=arr[r0+x0], b=arr[r0+x0+1], cc=arr[r1+x0], d=arr[r1+x0+1];
+      let val=a*(1-dx)*(1-dy)+b*dx*(1-dy)+cc*(1-dx)*dy+d*dx*dy;
+      if(val!==val){ val=sampleArr(ds,arr,ds.s+(ds.n-ds.s)*fy/(n-1),ds.w+(ds.e-ds.w)*fx/(n-1)); if(val!==val) continue; }  // bords de côte (vagues, eau)
+      if(conv) val=conv(val);
+      let j=Math.round((val-la)*lk); j=(j<0?0:j>ln?ln:j)*4; const k=(y*W+x)*4; D[k]=T0[j];D[k+1]=T0[j+1];D[k+2]=T0[j+2];D[k+3]=T0[j+3];
+    } }
   g.putImageData(img,0,0);
-  overlays[pane]=L.imageOverlay(c.toDataURL(),map.getBounds(),{pane,opacity,interactive:false}).addTo(map);
+  overlays[pane]=canvasLayer(c,{pane,opacity}).addTo(map);
 }
 function renderAll(){
   const f=FIELDS[S.field];
@@ -662,7 +753,7 @@ function arrowLayer(pane,fn,step){
     g.strokeStyle=r.col||"#fff"; g.lineWidth=1.8; arrowPath(g); g.stroke(); g.restore();
     if(r.label){ g.lineWidth=3; g.strokeStyle="rgba(0,0,0,.75)"; g.strokeText(r.label,x,y+21); g.fillStyle="#fff"; g.fillText(r.label,x,y+21); }
   }
-  if(any) overlays[pane]=L.imageOverlay(c.toDataURL(),map.getBounds(),{pane,interactive:false}).addTo(map);
+  if(any) overlays[pane]=canvasLayer(c,{pane}).addTo(map);
 }
 // Jet-stream : vent à 250 hPa (≈ FL340), affiché seulement au-delà de 60 kt
 function renderJet(){
@@ -719,7 +810,7 @@ function renderIsobars(){
     g.lineWidth=4; g.strokeStyle="rgba(0,0,0,.6)"; g.strokeText(hi?"A":"D",p.x,p.y); g.fillStyle=hi?"#7fb6ff":"#ff8a8a"; g.fillText(hi?"A":"D",p.x,p.y);
     g.font="600 10.5px JetBrains Mono, monospace"; g.lineWidth=3; g.strokeText(Math.round(v),p.x,p.y+18); g.fillStyle="#fff"; g.fillText(Math.round(v),p.x,p.y+18); g.font="800 26px Inter, sans-serif";
   }
-  overlays.ovIso=L.imageOverlay(c.toDataURL(),map.getBounds(),{pane:"ovIso",interactive:false}).addTo(map);
+  overlays.ovIso=canvasLayer(c,{pane:"ovIso"}).addTo(map);
 }
 function renderValues(){
   if(overlays.ovValues){ map.removeLayer(overlays.ovValues); delete overlays.ovValues; }
@@ -742,7 +833,7 @@ function renderValues(){
     g.fillStyle=t<=0?"#9ad8ff":"#ffd27a"; g.fillText(`${Math.round(t)}°`,x-4,y-7);
     g.fillStyle="#e8eef6"; g.fillText(`${Math.round(spd)}kt`,x-4,y+8);
   }
-  overlays.ovValues=L.imageOverlay(c.toDataURL(),map.getBounds(),{pane:"ovValues",interactive:false}).addTo(map);
+  overlays.ovValues=canvasLayer(c,{pane:"ovValues"}).addTo(map);
 }
 function updateLegend(){
   const f=FIELDS[S.field], lvl=f?.levels?` · ${altName(S.alt)}`:"";
@@ -838,6 +929,9 @@ function fltCat(m){
 }
 const metarWind=m=>{ const w=m?.match(/\s(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT/); return w?`${w[1]}/${w[2]}${w[3]?"G"+w[3]:""}`:""; };
 async function initMetars(){
+  setLoading("metar",true); try{ await initMetars0(); } finally{ setLoading("metar",false); }
+}
+async function initMetars0(){
   try{ await loadMetarText(); }catch(e){ status("METAR indisponibles (VATSIM ne répond pas)"); return; }
   // sur téléphone, la base des aérodromes (gros fichiers) se télécharge après le démarrage, une seule fois
   let cached=false; try{ cached=!!localStorage.getItem("rb2st"); }catch(e){}
@@ -911,7 +1005,7 @@ function renderWx(){
   $("fop").oninput=e=>{ S.fieldOpacity=+e.target.value; save(); overlays.field?.setOpacity(S.fieldOpacity); };
 }
 function onLayerChange(k){
-  if(k==="radar"){ rLayers.forEach(l=>S.radar?l.addTo(map):map.removeLayer(l)); showRadar(); }
+  if(k==="radar"){ if(!S.radar) rLayers.forEach(l=>map.removeLayer(l)); showRadar(); }
   else if(k==="metar") drawMetars();
   else if(k==="sat") applySat();
   else { resetParticles(); renderAll(); scheduleGrids(50); }
@@ -939,6 +1033,8 @@ function renderSettings(){
   $("p-settings").innerHTML=`
    <div class="sec">Clé OpenAIP (gratuite)</div>
    <div class="field"><label for="k_openaip">openaip.net → photo de profil → API Clients → « Request new API client » → copie le « Client ID Token »</label><input class="txt" id="k_openaip" value="${S.keys.openaip||""}" placeholder="colle ta clé ici"></div>
+   <div class="sec">Apparence</div>
+   <div class="ctrl"><label>Thème</label><div class="seg">${[["ardoise","Ardoise"],["nuit","Nuit"]].map(([k,l])=>`<button data-theme-set="${k}" aria-pressed="${(S.theme||"ardoise")===k}">${l}</button>`).join("")}</div></div>
    <div class="sec">Widgets sur la carte</div>
    ${Object.entries(WIDGETS).map(([k,w])=>row({icon:w.icon,title:w.name,sub:w.sub,pressed:S.widgets.includes(k),sw:true,attr:`data-wg="${k}"`})).join("")}
    ${row({icon:"cloud",title:"Prévisions 5 jours",sub:"bandeau en bas à gauche, style Météo d'Apple",pressed:S.fc5,sw:true,attr:'data-fc5="1"'})}
@@ -948,12 +1044,13 @@ function renderSettings(){
    <div class="field"><label for="xlimIn">Limite de vent de travers (kt)</label><input class="txt" id="xlimIn" type="number" min="5" max="35" value="${S.xlim}"></div>
    <div class="sec">Données modèle</div>
    <div class="ctrl"><label>Finesse grille</label><div class="seg" id="gridSeg">${[8,10,14].map(n=>`<button data-g="${n}" aria-pressed="${S.grid===n}">${n}×${n}</button>`).join("")}</div></div>
-   <div class="note">Consommation estimée sur la dernière heure : <b style="color:var(--fg)">${usage(0).toLocaleString("fr-FR")}</b> / 5 000 requêtes Open-Meteo gratuites. Chaque chargement de zone coûte environ ${S.grid*S.grid} requêtes ; une grille plus fine est plus précise mais épuise la limite plus vite.<br><br>Sources : Open-Meteo (Météo-France AROME/ARPEGE, ECMWF, GFS, CAMS), RainViewer, VATSIM, OurAirports, NOAA SWPC, NASA GIBS, Esri, OpenAIP, FAA, IGN.</div>`;
+   <div class="note">Consommation Open-Meteo estimée (sur cet appareil) : <b style="color:var(--fg)">${usage(0).toLocaleString("fr-FR")}</b> sur la dernière heure (limite 5 000) et <b style="color:var(--fg)">${usage(0,864e5).toLocaleString("fr-FR")}</b> sur 24 h (limite 10 000).${omBlocked()?` <b style="color:var(--warn)">En pause jusqu'à ${lt(omBlockedUntil()/1000)}.</b>`:""} Chaque nouvelle zone coûte environ ${GRIDN()*GRIDN()} requêtes ; les zones déjà vues sont gardées 90 min sur l'appareil. Les favoris, widgets et 5 jours passent par MET Norway et ne consomment rien ici.<br><br>Sources : Open-Meteo (Météo-France AROME/ARPEGE, ECMWF, GFS, CAMS), RainViewer, VATSIM, OurAirports, NOAA SWPC, NASA GIBS, Esri, OpenAIP, FAA, IGN.</div>`;
   $("k_openaip").onchange=e=>{ S.keys.openaip=e.target.value.trim(); save(); applyCharts(); };
   $("xlimIn").onchange=e=>{ S.xlim=clamp(+e.target.value||10,5,35); save(); if(P) renderPoint(); };
   $("p-settings").querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{ S.grid=+b.dataset.g; save(); renderSettings(); scheduleGrids(50); });
   $("p-settings").querySelectorAll("[data-wg]").forEach(b=>b.onclick=()=>{ const k=b.dataset.wg; S.widgets=S.widgets.includes(k)?S.widgets.filter(x=>x!==k):[...S.widgets,k]; save(); renderSettings(); renderWidgets(); });
   $("p-settings").querySelector("[data-fc5]").onclick=()=>{ S.fc5=!S.fc5; save(); renderSettings(); renderFc5(); };
+  $("p-settings").querySelectorAll("[data-theme-set]").forEach(b=>b.onclick=()=>{ S.theme=b.dataset.themeSet; save(); applyTheme(); renderSettings(); });
   $("p-settings").querySelectorAll("[data-wpos]").forEach(b=>b.onclick=()=>{ S.wpos=b.dataset.wpos; save(); renderSettings(); renderWidgets(); });
 }
 
@@ -1024,11 +1121,12 @@ const EXTRA_SAFE=["uv_index","apparent_temperature","surface_pressure","snow_dep
 const POLL=[["grass_pollen","graminées"],["birch_pollen","bouleau"],["alder_pollen","aulne"],["olive_pollen","olivier"],["mugwort_pollen","armoise"],["ragweed_pollen","ambroisie"]];
 async function openPoint(lat,lon,opts={}){
   lon=wrapLon(lon); ptMarker.setLatLng([lat,lon]).addTo(map);
-  P={lat,lon,icao:opts.icao,name:opts.name||null,loading:true}; openPanel("point"); renderPoint(); updateRef();
+  P={lat,lon,icao:opts.icao,name:opts.name||null,loading:true}; openPanel("point"); renderPoint(); updateRef(); setLoading("point",true);
   const ll=`latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`;
   const pv=PLEV.flatMap(p=>["temperature","relative_humidity","wind_speed","wind_direction","geopotential_height"].map(v=>`${v}_${p}hPa`));
   const hv=["temperature_2m","dew_point_2m","relative_humidity_2m","pressure_msl","wind_speed_10m","wind_direction_10m","wind_gusts_10m","cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","visibility","precipitation","precipitation_probability","freezing_level_height","cape","weather_code",...pv];
-  const J=u=>fetch(u).then(r=>r.json()).then(j=>{ if(j?.error) throw new Error(j.reason); return j; });
+  const J=u=>omBlocked()?Promise.reject(new Error("limit (pause)")):fetch(u).then(r=>r.json()).then(j=>{ if(j?.error){ if(/limit/i.test(j.reason||"")) omHitLimit(j.reason); throw new Error(j.reason); } return j; });
+  if(!omBlocked()) usage(9);
   const extra=(vars)=>J(`https://api.open-meteo.com/v1/forecast?${ll}&hourly=${vars.join(",")}&daily=weather_code,precipitation_probability_max,uv_index_max,sunshine_duration,daylight_duration,temperature_2m_max,temperature_2m_min,precipitation_sum&past_hours=3&forecast_hours=74&timeformat=unixtime&timezone=auto&wind_speed_unit=kn`);
   const [a,b,c,d]=await Promise.allSettled([
     J(`https://api.open-meteo.com/v1/forecast?${ll}&hourly=${hv.join(",")}&past_hours=3&forecast_hours=74&timeformat=unixtime&timezone=auto&wind_speed_unit=kn`),
@@ -1038,11 +1136,15 @@ async function openPoint(lat,lon,opts={}){
   ]);
   await loadKp();
   if(!P||P.lat!==lat||P.lon!==lon) return;
-  P.loading=false;
   P.fc=a.status==="fulfilled"?a.value:null; P.err=P.fc?null:String(a.reason?.message||"prévision indisponible");
   P.mar=b.status==="fulfilled"?b.value:null;
   P.ex=c.status==="fulfilled"?c.value:null;
   P.aq=d.status==="fulfilled"?d.value.current:null;
+  P.src="om";
+  if(!P.fc){ // secours : MET Norway
+    try{ const m=await metno(lat,lon); if(!P||P.lat!==lat||P.lon!==lon) return; P.fc=m; P.ex=m; P.src="metno"; P.err=null; }catch(e){ P.err+=" · secours MET Norway : "+e.message; }
+  }
+  P.loading=false; setLoading("point",false);
   renderPoint();
 }
 function hIndex(times,t){ let best=0; for(let i=1;i<times.length;i++) if(Math.abs(times[i]-t)<Math.abs(times[best]-t)) best=i; return best; }
@@ -1072,6 +1174,7 @@ function renderPoint(){
   const elevNow=sunElev(curT(),P.lat,P.lon), mo=moon(curT());
   const dly=P.ex?.daily, di=dly?.time?Math.max(0,dly.time.findIndex(t=>t+86400>curT())):0;
 
+  if(P.src==="metno") h+=`<div class="note" style="color:var(--warn)">Source de secours : MET Norway, car la limite gratuite d'Open-Meteo est atteinte${omBlockedUntil()>Date.now()?` (jusqu'à ${lt(omBlockedUntil()/1000)})`:""}. Le profil vertical, l'iso 0 °C, la CAPE et la qualité de l'air reviendront après la pause.</div>`;
   if(dly?.weather_code) h+=`<div class="sec">Prévisions 5 jours</div><div class="pt-fc5">${fc5Rows(dly,P.ex.utc_offset_seconds??off,T)}</div>`;
   h+=`<div class="sec">Conditions</div><div class="tiles">
     ${tile("Vent",`${dir3(wd)}° / ${n0(ws)} kt${gu>ws+8?` <small>G${n0(gu)}</small>`:""}`,`80 m : ${n0(x("wind_speed_80m"))} kt · 120 m : ${n0(x("wind_speed_120m"))} kt`)}
@@ -1205,10 +1308,63 @@ const CARD=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","
 const card16=d=>d==null?"–":CARD[Math.round(((d%360)+360)%360/22.5)%16];
 const beaufort=kt=>[1,4,7,11,17,22,28,34,41,48,56,64].findIndex(v=>kt<v)===-1?12:[1,4,7,11,17,22,28,34,41,48,56,64].findIndex(v=>kt<v);
 
-// ---------- Météo des lieux (favoris, widgets, 5 jours) ----------
+// ---------- MET Norway (institut norvégien, gratuit, sans clé, mondial) ----------
+// Converti au même format qu'Open-Meteo pour réutiliser tout l'affichage.
+const MN={};
+const mnCode=s=>{ if(!s) return null; const b=s.replace(/_(day|night|polartwilight)$/,"");
+  if(/thunder/.test(b)) return 95; if(b==="clearsky") return 0; if(b==="fair") return 1; if(b==="partlycloudy") return 2; if(b==="cloudy") return 3; if(b==="fog") return 45;
+  if(/snowshowers/.test(b)) return 85; if(/snow/.test(b)) return /heavy/.test(b)?75:/light/.test(b)?71:73; if(/sleet/.test(b)) return 67;
+  if(/rainshowers/.test(b)) return /heavy/.test(b)?82:80; if(/rain/.test(b)) return /heavy/.test(b)?65:/light/.test(b)?61:63; return 3; };
+async function metno(lat,lon){
+  const key=lat.toFixed(2)+","+lon.toFixed(2), c=MN[key]; if(c&&Date.now()-c.at<15*60e3) return c.d;
+  const r=await fetch(`https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
+  if(!r.ok) throw new Error("MET Norway "+r.status);
+  const j=await r.json(), ts=j.properties.timeseries, KT=1.94384, off=-new Date().getTimezoneOffset()*60;
+  const keys=["time","temperature_2m","dew_point_2m","relative_humidity_2m","pressure_msl","wind_speed_10m","wind_direction_10m","wind_gusts_10m","cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","visibility","precipitation","precipitation_probability","weather_code","uv_index","apparent_temperature"];
+  const H=Object.fromEntries(keys.map(k=>[k,[]])), extremes=[];
+  ts.forEach((e,i)=>{ const d=e.data.instant.details, n1=e.data.next_1_hours, n6=e.data.next_6_hours, nx=n1||n6, t=Date.parse(e.time)/1000;
+    const step=i<ts.length-1?(Date.parse(ts[i+1].time)/1000-t)/3600:1;
+    H.time.push(t); H.temperature_2m.push(d.air_temperature??null); H.dew_point_2m.push(d.dew_point_temperature??null); H.relative_humidity_2m.push(d.relative_humidity??null);
+    H.pressure_msl.push(d.air_pressure_at_sea_level??null); H.wind_speed_10m.push(d.wind_speed!=null?d.wind_speed*KT:null); H.wind_direction_10m.push(d.wind_from_direction??null);
+    H.wind_gusts_10m.push(d.wind_speed_of_gust!=null?d.wind_speed_of_gust*KT:null); H.cloud_cover.push(d.cloud_area_fraction??null); H.cloud_cover_low.push(d.cloud_area_fraction_low??null);
+    H.cloud_cover_mid.push(d.cloud_area_fraction_medium??null); H.cloud_cover_high.push(d.cloud_area_fraction_high??null);
+    H.visibility.push(d.fog_area_fraction>=50?800:d.fog_area_fraction>=20?4000:null);
+    H.precipitation.push(n1?.details?.precipitation_amount??(n6?.details?.precipitation_amount!=null?n6.details.precipitation_amount/6:null));
+    H.precipitation_probability.push(nx?.details?.probability_of_precipitation??null);
+    H.weather_code.push(mnCode(nx?.summary?.symbol_code)); H.uv_index.push(d.ultraviolet_index_clear_sky??null); H.apparent_temperature.push(d.apparent_air_temperature??null);
+    extremes.push([n6?.details?.air_temperature_min,n6?.details?.air_temperature_max,step]); });
+  const days={}; H.time.forEach((t,i)=>{ const dk=Math.floor((t+off)/86400); (days[dk]=days[dk]||[]).push(i); });
+  const D={time:[],weather_code:[],temperature_2m_max:[],temperature_2m_min:[],precipitation_probability_max:[],precipitation_sum:[],uv_index_max:[],sunrise:[],sunset:[]};
+  for(const dk of Object.keys(days).map(Number).sort((a,b)=>a-b)){
+    const ix=days[dk], day0=dk*86400-off;
+    const temps=ix.flatMap(i=>[H.temperature_2m[i],extremes[i][0],extremes[i][1]]).filter(v=>v!=null);
+    const dayIx=ix.filter(i=>{ const h=new Date((H.time[i]+off)*1000).getUTCHours(); return h>=8&&h<=18; });
+    const codes=(dayIx.length?dayIx:ix).map(i=>H.weather_code[i]).filter(v=>v!=null), pp=ix.map(i=>H.precipitation_probability[i]).filter(v=>v!=null), uv=ix.map(i=>H.uv_index[i]).filter(v=>v!=null);
+    const [rise,set]=sunCross(day0,lat,lon,-0.833);
+    D.time.push(day0); D.temperature_2m_max.push(Math.max(...temps)); D.temperature_2m_min.push(Math.min(...temps));
+    D.weather_code.push(codes.length?Math.max(...codes):null); D.precipitation_probability_max.push(pp.length?Math.max(...pp):null);
+    D.precipitation_sum.push(ix.reduce((a,i)=>a+(H.precipitation[i]||0)*Math.min(6,extremes[i][2]),0)); D.uv_index_max.push(uv.length?Math.max(...uv):null);
+    D.sunrise.push(rise); D.sunset.push(set);
+  }
+  const now=Date.now()/1000, ci=Math.max(0,H.time.findIndex(t=>t+1800>now)), g=k=>H[k][ci];
+  const d={source:"metno",elevation:j.geometry?.coordinates?.[2]??0,utc_offset_seconds:off,hourly:H,daily:D,
+    current:{temperature_2m:g("temperature_2m"),apparent_temperature:g("apparent_temperature"),relative_humidity_2m:g("relative_humidity_2m"),weather_code:g("weather_code"),
+      is_day:sunElev(now,lat,lon)>-0.833?1:0,wind_speed_10m:g("wind_speed_10m"),wind_direction_10m:g("wind_direction_10m"),wind_gusts_10m:g("wind_gusts_10m"),
+      pressure_msl:g("pressure_msl"),cloud_cover:g("cloud_cover"),uv_index:g("uv_index")}};
+  MN[key]={at:Date.now(),d}; return d;
+}
+
+// ---------- Météo des lieux (favoris, widgets, 5 jours) : MET Norway d'abord, Open-Meteo en secours ----------
 const WX={};
 const keyOf=(lat,lon)=>lat.toFixed(2)+","+lon.toFixed(2);
 async function loadWx(locs){
+  const out=await Promise.all(locs.map(l=>metno(l.lat,l.lon).catch(()=>null)));
+  if(out.every(Boolean)) return out;
+  const om=omBlocked()?[]:await loadWxOM(locs.filter((l,i)=>!out[i]));
+  let k=0; return out.map(d=>d||om[k++]||null);
+}
+async function loadWxOM(locs){
+  if(!locs.length) return [];
   const now=Date.now(), miss=locs.filter(l=>{const w=WX[keyOf(l.lat,l.lon)]; return !w||now-w.at>10*60e3;});
   if(miss.length){
     try{
@@ -1218,7 +1374,7 @@ async function loadWx(locs){
         `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset${uv?",uv_index_max":""}&forecast_days=6&timezone=auto&timeformat=unixtime&wind_speed_unit=kn`).then(r=>r.json());
       let j=await ask(true);
       if(j?.error&&!/limit/i.test(j.reason||"")) j=await ask(false);   // repli si une variable est refusée
-      if(j?.error) throw new Error(j.reason); if(!Array.isArray(j)) j=[j];
+      if(j?.error){ if(/limit/i.test(j.reason||"")) omHitLimit(j.reason); throw new Error(j.reason); } if(!Array.isArray(j)) j=[j];
       j.forEach((d,i)=>{ WX[keyOf(miss[i].lat,miss[i].lon)]={at:now,d}; });
     }catch(e){ status("Météo des lieux indisponible : "+e.message); }
   }
@@ -1365,6 +1521,25 @@ function status(t){$("status").textContent=t;}
 
 // ---------- Démarrage ----------
 applyBase(); applyCharts(); applySat(); renderWx(); sizeCanvas(); frame();
+// ---------- Me localiser ----------
+$("tbLoc").onclick=()=>{
+  if(!navigator.geolocation){ status("La localisation n'est pas disponible sur ce navigateur"); return; }
+  setLoading("loc",true); status("Recherche de ta position…");
+  navigator.geolocation.getCurrentPosition(p=>{ setLoading("loc",false); const {latitude:la,longitude:lo}=p.coords; map.setView([la,lo],Math.max(map.getZoom(),9)); openPoint(la,lo,{name:"Ma position"}); status("Position trouvée"); },
+    e=>{ setLoading("loc",false); status(e.code===1?"Localisation refusée : autorise-la dans les réglages du navigateur":"Position introuvable pour le moment"); },{enableHighAccuracy:false,timeout:12000,maximumAge:300000});
+};
+// ---------- Raccourcis clavier (ordinateur) ----------
+addEventListener("keydown",e=>{
+  if(e.target.closest("input,textarea,select")||e.metaKey||e.ctrlKey||e.altKey) return;
+  const k=e.key;
+  if(k===" "){ e.preventDefault(); $("play").click(); }
+  else if(k==="ArrowRight") setTime(tIdx+1);
+  else if(k==="ArrowLeft") setTime(tIdx-1);
+  else if(k==="n"||k==="N") setTime(nowIdx);
+  else if(k==="ArrowUp"){ e.preventDefault(); setAlt(S.alt+1000,true); }
+  else if(k==="ArrowDown"){ e.preventDefault(); setAlt(S.alt-1000,true); }
+  else if(k==="Escape"&&panel){ panel="x"; openPanel("x"); }
+});
 loadRadar(); refreshGrids(); initMetars(); loadKp().then(()=>renderWidgets()); renderWidgets(); updateRef();
 setInterval(()=>{ updateRef(); if(panel==="favs") renderFavs(); },10*60e3);
 setInterval(loadRadar,5*60e3); setInterval(()=>{ if(GA) GA.at=0; if(GM) GM.at=0; refreshGrids(); },60*60e3); setInterval(initMetars,10*60e3);
